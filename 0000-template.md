@@ -1,7 +1,7 @@
 - Feature Name: (fill me in with a unique ident, `my_awesome_feature`)
 - Start Date: (fill me in with today's date, YYYY-MM-DD)
 - RFC PR: [8xff/rfcs#0000](https://github.com/8xff/rfcs/pull/0000)
-- Rust Issue: [8xff/rust#0000](https://github.com/8xff/rust/issues/0000)
+- Related Issue: [8xff/project-name#0000](https://github.com/8xff/project-name/issues/0000)
 
 # Summary
 [summary]: #summary
@@ -13,12 +13,12 @@ One paragraph explanation of the feature.
 
 Why are we doing this? What use cases does it support? What is the expected outcome?
 
-## User Benefit
+# User Benefit
 
 How will users (or other contributors) benefit from this work? What would be the
 headline in the release notes or blog post?
 
-## Design Proposal
+# Design Proposal
 
 This is the meat of the document, where you explain your proposal. If you have
 multiple alternatives, be sure to use sub-sections for better separation of the
