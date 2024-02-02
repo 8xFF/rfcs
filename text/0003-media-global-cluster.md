@@ -1,7 +1,6 @@
 - Feature Name: media-global-cluster
 - Start Date: 2024-02-02
-- RFC PR: [8xff/rfcs#0000](https://github.com/8xff/rfcs/pull/0000)
-- Rust Issue: [8xff/rust#0000](https://github.com/8xff/rust/issues/0000)
+- RFC PR: [8xff/rfcs#0003](https://github.com/8xff/rfcs/pull/0003)
 
 # Summary
 [summary]: #summary
@@ -23,7 +22,7 @@ The user can setup a cluster across multiple regions and the system will automat
 
 ### Gateway
 
-![Single zone](./0000-media-global-cluster/single-zone.excalidraw.png)
+![Single zone](./0003-media-global-cluster/single-zone.excalidraw.png)
 
 We propose a gateway node, which will take care to route each request to best node. The process is described as below:
 
@@ -39,7 +38,7 @@ Routing process:
 
 ### Topology
 
-![Multi zones](./0000-media-global-cluster/multi-zones.excalidraw.png)
+![Multi zones](./0003-media-global-cluster/multi-zones.excalidraw.png)
 
 Each media servers is connected to all gateway nodes in same zone. Each gateway node is connected to all gateway nodes in same zone and all gateway nodes in other zones.
 
