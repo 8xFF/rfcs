@@ -13,12 +13,12 @@ One paragraph explanation of the feature.
 
 Why are we doing this? What use cases does it support? What is the expected outcome?
 
-## User Benefit
+# User Benefit
 
 How will users (or other contributors) benefit from this work? What would be the
 headline in the release notes or blog post?
 
-## Design Proposal
+# Design Proposal
 
 This is the meat of the document, where you explain your proposal. If you have
 multiple alternatives, be sure to use sub-sections for better separation of the
