@@ -1,0 +1,13 @@
+[book]
+title = "The 8xFF RFC Book"
+
+[output.html]
+no-section-label = true
+git-repository-url = "https://github.com/8xff/rfcs"
+site-url = "/rfcs/"
+
+[output.html.search]
+heading-split-level = 0
+
+[output.html.playground]
+runnable = false
