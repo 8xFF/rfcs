@@ -6,28 +6,33 @@
 
 [summary]: #summary
 
-This RFC describes how WebRTC client is connect to atm0s-media-server and how it works.
+This RFC provides an overview of how the WebRTC client connects to atm0s-media-server and its functionality.
 
 # 2. Motivation
 
 [motivation]: #motivation
 
-We need to create a client sdk which can be used in any platform and can be customized to fit with any use case. This sdk should be easy to use and easy to customize. It also need to work-well with atm0s-media-server network topology and our aproach to handle media stream.
+To enhance the user experience, we aim to develop a client SDK that is platform-agnostic and highly customizable. This SDK should provide a seamless integration with atm0s-media-server network topology and align with our approach to handle media streams. Our primary focus is to ensure that the SDK is user-friendly and easily adaptable to various use cases.
 
 # 3. User Benefit
 
-User can use WebRTC to connect to media-server, and can create very complex media stream topology.
+User can use WebRTC to connect to the media server and create complex media stream topologies.
 
 # 4. Design Proposal
 
-For simplicty we proposal a sdk protocol which only use with HTTP (not websocket) and WebRTC.
+To ensure simplicity, we propose a SDK protocol that exclusively uses HTTP (not WebSocket) and WebRTC.
 
-- HTTP is only used for sending RPC request to cluster (typicaly is Connect and Retry phase).
-- WebRTC is used for sending and receiving media stream and also rpc, event after connected.
+- HTTP is used only for sending RPC requests to the cluster, typically during the Connect and Retry phases.
+- WebRTC is utilized for sending and receiving media streams, as well as RPC and event communication after establishing a connection.
 
 ## 4.1 HTTP Request/Response format
 
-All request and response will be encoded in JSON format. The format is described as below:
+
+**Request and Response Format**
+
+All requests and responses will be encoded in JSON format. The format is described as follows:
+
+```json
 
 **Body:**: JSON
 
@@ -42,15 +47,16 @@ All request and response will be encoded in JSON format. The format is described
 }
 ```
 
-## 4.2 Connect request
 
-Client can prepare some senders or receivers before connect to server. When client connect to server, it will send a connect request to server.
+## 4.2 Connect Establishment
 
-Client must to prepare:
+Before connecting to the server, the client needs to prepare the following:
 
-- WebRTC connection with datachannel enabled.
-- List of senders and receivers.
-- WebRTC OfferSDP.
+- Enable WebRTC connection with data channel.
+- Create a list of senders and receivers.
+- Generate WebRTC OfferSDP.
+
+Once the client is ready, it can send a connect request to the server.
 
 **_Endpoint_**: `POST GATEWAY/webrtc/connect`
 
@@ -117,41 +123,41 @@ Client must to prepare:
 }
 ```
 
-In request:
+The explanation of each request parameter:
 
-- version: is the version of client sdk.
+- version: is the version of the client SDK.
 - event:
 
-  - publish: `full` will publish both peer info and tracks info. `track` will only publish tracks info.
-  - subscribe: `full` will subscribe both remote peer info and tracks info. `track` will only subscribe remote tracks info. `manual` with not subscribe any source, client must do it manual. This feature is useful for client which want to use manual mode to subscribe remote tracks. Example in spatial room application, client will set to `manual` and only subscribe to peer which near to it.
+    - publish: `full` will publish both peer info and track info. `track` will only publish track info.
+    - subscribe: `full` will subscribe to both remote peer info and track info. `track` will only subscribe to remote track info. `manual` will not subscribe to any source, the client must do it manually. This feature is useful for clients who want to use manual mode to subscribe to remote tracks. For example, in a spatial room application, the client will set it to `manual` and only subscribe to peers that are near to it.
 
 - bitrate:
 
-  - ingress is the bitrate mode for ingress stream. In `save` mode, media-server will limit bitrate based on network and consumers. In `max` mode, media-server will only limit bitrate by network and media-server config.
+    - ingress is the bitrate mode for the ingress stream. In `save` mode, the media server will limit the bitrate based on the network and consumers. In `max` mode, the media server will only limit the bitrate based on the network and media server configuration.
 
-- features: json object for containing some features which client want to use. For example: mix-minus, spatial room, etc.
+- features: a JSON object containing some features that the client wants to use. For example: mix-minus, spatial room, etc.
 - tracks:
 
-  - receivers: list of receivers which client want to create. Each receiver is described with:
+    - receivers: a list of receivers that the client wants to create. Each receiver is described with:
 
-    - kind: is the kind of receiver, audio or video.
-    - id: is the id of receiver.
-    - remote: is the remote source which client want to pin to. If it's none, the receiver will be created but not pin to any source.
-    - limit: is the limit of receiver. If it's none, the receiver will be created with default limit.
+        - kind: the kind of receiver, audio or video.
+        - id: the ID of the receiver.
+        - remote: the remote source that the client wants to pin to. If it's none, the receiver will be created but not pinned to any source.
+        - limit: the limit of the receiver. If it's none, the receiver will be created with the default limit.
 
-  - senders: list of senders which client want to create. Each sender is described with:
-    - kind: is the kind of sender, audio or video.
-    - id: is the id of sender.
-    - uuid: is the uuid of sender. It's used to identify the sender in client side.
-    - label: is the label of sender. It's used to identify the sender in client side.
-    - screen: is the flag to indicate that the sender is screen sharing.
+    - senders: a list of senders that the client wants to create. Each sender is described with:
+        - kind: the kind of sender, audio or video.
+        - id: the ID of the sender.
+        - uuid: the UUID of the sender. It's used to identify the sender on the client side.
+        - label: the label of the sender. It's used to identify the sender on the client side.
+        - screen: a flag to indicate whether the sender is screen sharing.
 
-- sdp: is the OfferSDP which client created.
+- sdp: the OfferSDP that the client created.
 
-In response:
+The explaination of each response parameter:
 
 - sdp: is the AnswerSDP which server created, it should contain all ice-candidates from server.
-- conn_id: global identify of WebRTC connection. This is used by control api like restart-ice, ice-trickle, kick, etc.
+- conn_id: global identifier of WebRTC connection. This is used by control api like restart-ice, ice-trickle, kick, etc.
 
 Error list:
 
@@ -163,9 +169,9 @@ Error list:
 | INTERNAL_SERVER_ERROR | The server is error.    |
 | GATEWAY_ERROR         | The gateway is error.   |
 
-After that client need to wait for connected event from WebRTC connection and connected event from datachannel.
-If after a period of time, client don't receive any event, it will set restart ice flag and retry connect to server with newest offer-sdp.
-After some tries (configurable), client will stop retry and report error to user as CONNECTION_TIMEOUT.
+After that, the client needs to wait for the connected event from the WebRTC connection and the connected event from the data channel.
+If the client doesn't receive any event after a period of time, it will set the restart ice flag and retry connecting to the server with the newest offer SDP.
+After several attempts (configurable), the client will stop retrying and report an error to the user as CONNECTION_TIMEOUT.
 
 ## 4.3 Restart-ice
 
@@ -177,11 +183,12 @@ After some tries (configurable), client will stop retry and report error to user
 
 **_Response Data_**: same with connect response
 
-By that way, incase of network change, client can retry connect to server with newest offer-sdp and if the server is still alive, it will response with new answer-sdp. If the server is dead, client will retry connect to another server and can be restore the session state by using track state.
+
+By doing this, in case of a network change, the client can retry connecting to the server with the newest offer SDP. If the server is still alive, it will respond with a new answer SDP. However, if the server is dead, the gateway will retry connecting to another server. The session state can be restored using the track state and each feature state.
 
 ## 4.4 Ice-tricle
 
-Each time client WebRTC connection has a new ice-candidate, it should sending to gateway over:
+Each time the client's WebRTC connection has a new ice-candidate, it should be sent to the gateway using the following endpoint:
 
 **_Endpoint_**: POST `GATEWAY/webrtc/conns/:conn_id/ice-remote`
 
@@ -191,7 +198,7 @@ Each time client WebRTC connection has a new ice-candidate, it should sending to
 
 ## 4.5 Datachannel Request/Response format
 
-All request and response sending over datachannel will be encoded in JSON format. The format is described as below:
+The format for encoding all requests and responses sent over the data channel is JSON. The structure of the request and response objects is as follows:
 
 Request/Event:
 
@@ -217,7 +224,7 @@ Response:
 }
 ```
 
-The seq is incresemental value, which is generated in sender side. The seq is helped us to mapping between request and response and also detect data lost.
+The seq is an incremental value generated on the sender side. It helps us to map between requests and responses and also detect data loss.
 
 The cmd is generate with rule: `identify.action`, for example:
 
@@ -231,20 +238,21 @@ The cmd is generate with rule: `identify.action`, for example:
 
 ## 4.6 In-session requests
 
-At current state, we will have only one WebRTC connection to server. So we don't need to send any request to server. All request will be send over datachannel.
 
-Typicaly, client will need some actions with media server:
+At the current state, we only have one WebRTC connection to the server, so there is no need to send any requests over HTTP. All requests will be sent over the WebRTC datachannel.
 
-- Create/Release sender
-- Create/Release receiver
-- Sender action: pause, resume, switch stream
-- Receiver action: pause, resume, switch remote source, update priority and layers
+Typically, the client will need to perform various actions with the media server, such as:
 
-All action which changed streams will be do at local-first, then calling updateSdp to server.
+- Creating/Releasing senders
+- Creating/Releasing receivers
+- Sender actions: pause, resume, switch stream
+- Receiver actions: pause, resume, switch remote source, update priority, and layers
+
+All actions that involve changing tracks will be performed locally first, and then the `updateSdp` command will be sent to the server.
 
 ### 4.6.1 UpdateSDP
 
-Each time we changed something in WebRTC connection, we need to send updateSdp request to server over datachannel. The request will be described in below:
+Each time we make changes to the WebRTC connection or negotiationneeded event fired, we need to send an `updateSdp` request to the server over the data channel. This request is described below:
 
 **_Cmd:_**: `peer.updateSdp`
 
@@ -283,7 +291,7 @@ Each time we changed something in WebRTC connection, we need to send updateSdp r
 
 ### 4.6.2 Room actions, event
 
-We can subscribe to peers event (joined, leaved, track added, track removed) and also can unsubscribe from it.
+We can subscribe to peers event (joined, left, track added, track removed) and also can unsubscribe from it.
 
 #### 4.6.2.1 Subscribe to other peers event
 
@@ -326,11 +334,11 @@ We can subscribe to peers event (joined, leaved, track added, track removed) and
 
 ### 4.6.4 Session Sender create/release, actions, events
 
-For create a sender we need to create a transiver with kind is audio or video. After that we need to create a track and add it to transiver. Then we need to sending updateSdp request to server.
+For creating a sender, we need to create a transceiver with kind as audio or video. After that, we need to create a track and add it to the transceiver. Then we need to send an updateSDP request to the server.
 
-For destroy a sender, we need to remove track from transiver and remove transiver from connection. Then we need to sending updateSdp request to server.
+For destroying a sender, we need to remove the track from the transceiver and remove the transceiver from the connection. Then we need to send an updateSDP request to the server.
 
-Each sender has some actions and some event with rule: `session.sender.{id}.{action}`
+Each sender has some actions and events with the following rule: `session.sender.{id}.{action}`
 
 #### 4.6.4.1 Switch sender source
 
@@ -361,9 +369,9 @@ Each sender has some actions and some event with rule: `session.sender.{id}.{act
 
 ### 4.6.5 Session Receiver create/release, actions
 
-For create a receiver we need to create a transiver with kind is audio or video. After that we need to create a track and add it to transiver. Then we need to sending updateSdp request to server.
+To create a receiver, we need to create a transceiver with kind as audio or video. After that, we need to create a track and add it to the transceiver. Then we need to send an updateSdp request to the server.
 
-Each receiver has some actions and some event with rule: `session.receiver.{id}.{action}`
+Each receiver has some actions and events with the following rule: `session.receiver.{id}.{action}`
 
 ### 4.6.5.1 Switch receiver source
 
@@ -418,12 +426,12 @@ If remote is none, the receiver will be paused.
 }
 ```
 
-Receiver state is explain below:
+Receiver state is explained below:
 
-- no_source: The receiver is created but don't pin to any source.
-- live: The receiver is live.
-- key_only: The receiver is live but only receive key frame, this maybe for speed limiter.
-- inactive: The receiver is pinned but not enough bandwidth to receive.
+- `no_source`: The receiver is created but not pinned to any source.
+- `live`: The receiver is live.
+- `key_only`: The receiver is live but only receives key frames, which may be for speed limiting purposes.
+- `inactive`: The receiver is pinned but does not have enough bandwidth to receive.
 
 ### 4.6.5.3 Receiver stats event
 
@@ -455,10 +463,11 @@ Receiver state is explain below:
 
 ### 4.7.1 Feature: mix-minus mixer
 
-Mix-minus feature has 2 modes:
 
-- Manual: client can add or remove source to mixer.
-- Auto: media-server will automatically add or remove all audio sources except the local source to mixer.
+The mix-minus feature has two modes:
+
+- Manual: In this mode, the client can manually add or remove sources to the mixer.
+- Auto: In this mode, the media server will automatically add or remove all audio sources except the local source to the mixer.
 
 #### 4.7.1.1 Connect request
 
