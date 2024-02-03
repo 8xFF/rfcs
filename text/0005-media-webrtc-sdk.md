@@ -32,11 +32,9 @@ To ensure simplicity, we propose a SDK protocol that exclusively uses HTTP (not 
 
 All requests and responses will be encoded in JSON format. The format is described as follows:
 
-```json
+**_Body:_**: JSON
 
-**Body:**: JSON
-
-**Response:\***
+**_Response:_**
 
 ```
 {
