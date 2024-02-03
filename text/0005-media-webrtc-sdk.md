@@ -33,7 +33,7 @@ All request and response will be encoded in JSON format. The format is described
 
 **Response:\***
 
-```json
+```
 {
     success: bool,
     error_code: Option<String>,
@@ -58,7 +58,7 @@ Client must to prepare:
 
 **_Body_**:
 
-```json
+```
 {
     version: Option<String>,
     room: String,
@@ -110,7 +110,7 @@ Client must to prepare:
 
 **_Response Data:_**
 
-```json
+```
 {
     sdp: Option<String>,
     conn_id: String,
@@ -195,7 +195,7 @@ All request and response sending over datachannel will be encoded in JSON format
 
 Request/Event:
 
-```json
+```
 {
     type: "event" | "request",
     seq: Number,
@@ -206,7 +206,7 @@ Request/Event:
 
 Response:
 
-```json
+```
 {
     type: "answer",
     seq: Number,
@@ -250,7 +250,7 @@ Each time we changed something in WebRTC connection, we need to send updateSdp r
 
 **_Data:_**
 
-```json
+```
 {
     sdp: String,
     tracks: {
@@ -275,7 +275,7 @@ Each time we changed something in WebRTC connection, we need to send updateSdp r
 
 **_Response data_**:
 
-```json
+```
 {
     sdp: String
 }
@@ -291,7 +291,7 @@ We can subscribe to peers event (joined, leaved, track added, track removed) and
 
 **_Request Data:_**
 
-```json
+```
 {
     peer_id: String,
 }
@@ -305,7 +305,7 @@ We can subscribe to peers event (joined, leaved, track added, track removed) and
 
 **_Request Data:_**
 
-```json
+```
 {
     peer_id: String,
 }
@@ -338,7 +338,7 @@ Each sender has some actions and some event with rule: `session.sender.{id}.{act
 
 **_Request data:_**
 
-```json
+```
 {
     track: Option<String>,
     label: Option<String>,
@@ -353,7 +353,7 @@ Each sender has some actions and some event with rule: `session.sender.{id}.{act
 
 **_Event data:_**:
 
-```json
+```
 {
     state: "new" | "live" | "paused"
 }
@@ -371,7 +371,7 @@ Each receiver has some actions and some event with rule: `session.receiver.{id}.
 
 **_Request data:_**
 
-````json
+````
 {
     priority: u16,
     remote: Option<{
@@ -390,7 +390,7 @@ If remote is none, the receiver will be paused.
 
 ***Request data:***
 
-```json
+```
 {
     priority: u16,
     min_spatial: Option<u8>,
@@ -408,7 +408,7 @@ If remote is none, the receiver will be paused.
 
 **_Event data:_**:
 
-```json
+```
 {
     state: "no_source" | "live" | "key_only" | "inactive",
     source: Option<{
@@ -431,7 +431,7 @@ Receiver state is explain below:
 
 **_Event data:_**:
 
-```json
+```
 {
     codec: String,
     ingress: Option<{
@@ -464,7 +464,7 @@ Mix-minus feature has 2 modes:
 
 In connect request, we add field to features params:
 
-```json
+```
 {
     features: {
         mix_minus: {
@@ -488,7 +488,7 @@ Note that, this action only work with `manual` mode.
 
 **_Request data:_**
 
-```json
+```
 {
     peer: String,
     track: String,
@@ -505,7 +505,7 @@ Note that, this action only work with `manual` mode.
 
 **_Request data:_**
 
-```json
+```
 {
     peer: String,
     track: String,
@@ -536,7 +536,7 @@ Note that, this action only work with `manual` mode.
 
 **_Event data:_**
 
-```json
+```
 {
     layers: [
         {
