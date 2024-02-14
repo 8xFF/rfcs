@@ -164,7 +164,7 @@ The explanation of each request parameter:
 
 - sdp: the OfferSDP that the client created.
 
-The explaination of each response parameter:
+The explanation of each response parameter:
 
 - sdp: is the AnswerSDP which server created, it should contain all ice-candidates from server.
 - conn_id: global identifier of WebRTC connection. This is used by control api like restart-ice, ice-trickle, kick, etc.
