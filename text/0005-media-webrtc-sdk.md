@@ -24,9 +24,19 @@ To ensure simplicity, we propose a SDK protocol that exclusively uses HTTP (not 
 
 - HTTP is used only for sending RPC requests to the cluster, typically during the Connect and Retry phases.
 - WebRTC is utilized for sending and receiving media streams, as well as RPC and event communication after establishing a connection.
+- Each client will have sender tracks and receiver tracks to handle media streams. Senders are responsible for sending media streams to the server, while receivers are used to receive media streams from the server. Both senders and receivers can be paused, resumed, or switched to another source. There are two types of senders: audio and video, and two types of receivers: audio and video. Each sender and receiver is assigned a unique ID by the client, such as 'audio_1', 'audio_2', 'video_1', 'video_2', and it does not need to be unique with other clients.
+
+We have some terms:
+
+- **_Sender_**: A sender is a track that sends media to the server. It can be an audio or video track.
+- **_Receiver_**: A receiver is a track that receives media from the server. It can be an audio or video track.
+- **_Source_**: A source that the receiver is pinned to. It can be a audio or video. Source is identify by a pair peer_id and track_id.
+- **_Peer_**: A peer is a client that is connected to the server.
+- **_Room_**: A room is a group of peers that are connected to the same server.
+- **_Conn_**: A connection is a WebRTC connection between the client and the server.
+- **_Feature_**: A feature is a set of advance functionalities that the client can use. For example, mix-minus, chat, ...
 
 ## 4.1 HTTP Request/Response format
-
 
 **Request and Response Format**
 
@@ -44,7 +54,6 @@ All requests and responses will be encoded in JSON format. The format is describ
     data: Option<JSON>,
 }
 ```
-
 
 ## 4.2 Connect Establishment
 
@@ -81,7 +90,7 @@ Once the client is ready, it can send a connect request to the server.
                 kind: "audio" | "video",
                 id: String,
                 state: Option<{
-                    remote: Option<{
+                    source: Option<{
                         peer: String,
                         track: String,
                     }>,
@@ -126,32 +135,32 @@ The explanation of each request parameter:
 - version: is the version of the client SDK.
 - event:
 
-    - publish: `full` will publish both peer info and track info. `track` will only publish track info.
-    - subscribe: `full` will subscribe to both remote peer info and track info. `track` will only subscribe to remote track info. `manual` will not subscribe to any source, the client must do it manually. This feature is useful for clients who want to use manual mode to subscribe to remote tracks. For example, in a proximity based audio application like [Gather](https://www.gather.town/), the client will set it to `manual` and only subscribe to peers that are near to it.
+  - publish: `full` will publish both peer info and track info. `track` will only publish track info.
+  - subscribe: `full` will subscribe to both remote peer info and track info. `track` will only subscribe to remote track info. `manual` will not subscribe to any source, the client must do it manually. This feature is useful for clients who want to use manual mode to subscribe to remote tracks. For example, in a proximity based audio application like [Gather](https://www.gather.town/), the client will set it to `manual` and only subscribe to peers that are near to it.
 
 - bitrate:
 
-    - ingress is the bitrate mode for the ingress stream. In `save` mode, the media server will limit the bitrate based on the network and consumers. In `max` mode, the media server will only limit the bitrate based on the network and media server configuration.
+  - ingress is the bitrate mode for the ingress stream. In `save` mode, the media server will limit the bitrate based on the network and consumers. In `max` mode, the media server will only limit the bitrate based on the network and media server configuration.
 
 - features: a JSON object containing some features that the client wants to use. For example: mix-minus, spatial room, etc.
 - tracks:
 
-    - receivers: a list of receivers that the client wants to create. Each receiver is described with:
+  - receivers: a list of receivers that the client wants to create. Each receiver is described with:
 
-        - kind: the kind of receiver, audio or video.
-        - id: the ID of the receiver.
-        - state: the state of the receiver. It's used to restore the receiver state when the client reconnects to the server. It contains:
-            - remote: the remote source that the client wants to pin to. If it's none, the receiver will be created but not pinned to any source.
-            - limit: the limit of the receiver. If it's none, the receiver will be created with the default limit.
+    - kind: the kind of receiver, audio or video.
+    - id: the ID of the receiver.
+    - state: the state of the receiver. It's used to restore the receiver state when the client reconnects to the server. It contains:
+      - source: the remote source that the client wants to pin to. If it's none, the receiver will be created but not pinned to any source.
+      - limit: the limit of the receiver. If it's none, the receiver will be created with the default limit.
 
-    - senders: a list of senders that the client wants to create. Each sender is described with:
-        - kind: the kind of sender, audio or video.
-        - id: the ID of the sender.
-        - uuid: the UUID of the sender. It's used to identify the sender on the client side.
-        - label: the label of the sender. It's used to identify the sender on the client side.
-        - state: the state of the sender. It's used to restore the sender state when the client reconnects to the server. It contains:
-            - screen: a flag to indicate whether the sender is screen sharing.
-            - pause: a flag to indicate whether the sender is paused.
+  - senders: a list of senders that the client wants to create. Each sender is described with:
+    - kind: the kind of sender, audio or video.
+    - id: the ID of the sender.
+    - uuid: the UUID of the sender. It's used to identify the sender on the client side.
+    - label: the label of the sender. It's used to identify the sender on the client side.
+    - state: the state of the sender. It's used to restore the sender state when the client reconnects to the server. It contains:
+      - screen: a flag to indicate whether the sender is screen sharing.
+      - pause: a flag to indicate whether the sender is paused.
 
 - sdp: the OfferSDP that the client created.
 
@@ -184,14 +193,13 @@ After several attempts (configurable), the client will stop retrying and report 
 
 **_Response Data_**: same with connect response
 
-
 By doing this, in case of a network change, the client can retry connecting to the server with the newest offer SDP. If the server is still alive, it will respond with a new answer SDP. However, if the server is dead, the gateway will retry connecting to another server. The session state can be restored using the track state and each feature state.
 
 ## 4.4 Ice-tricle
 
 Each time the client's WebRTC connection has a new ice-candidate, it should be sent to the gateway using the following endpoint:
 
-**_Endpoint_**: POST `GATEWAY/webrtc/conns/:conn_id/ice-remote`
+**_Endpoint_**: POST `GATEWAY/webrtc/conns/:conn_id/ice-candidate`
 
 **_Body_**: candidate String
 
@@ -238,7 +246,6 @@ The cmd is generate with rule: `identify.action`, for example:
 - `session.features.mix_minus.sources.add`.
 
 ## 4.6 In-session requests
-
 
 At the current state, we only have one WebRTC connection to the server, so there is no need to send any requests over HTTP. All requests will be sent over the WebRTC datachannel.
 
@@ -387,7 +394,7 @@ Each receiver has some actions and events with the following rule: `session.rece
 ````
 {
     priority: u16,
-    remote: Option<{
+    source: Option<{
         peer: String,
         track: String,
     }>,
@@ -395,7 +402,7 @@ Each receiver has some actions and events with the following rule: `session.rece
 
 ***Response data:***: None
 
-If remote is none, the receiver will be paused.
+If source is none, the receiver will be paused.
 
 ### 4.6.5.2 Limit receiver bitrate
 
@@ -450,13 +457,13 @@ Receiver state is explained below:
 
 ```
 {
-    ingress: Option<{
+    source: Option<{
         bitrate: Number,
         rtt: Number,
         lost: Number,
         jitter: Number,
     }>,
-    egress: Option<{
+    transmit: Option<{
         spatial: Number,
         temporal: Number,
         bitrate: Number,
@@ -467,7 +474,6 @@ Receiver state is explained below:
 ## 4.7 Features
 
 ### 4.7.1 Feature: mix-minus mixer
-
 
 The mix-minus feature has two modes:
 
@@ -562,7 +568,7 @@ Note that, this action only work with `manual` mode.
 {
     slots: [
         {
-            remote: Option<{
+            source: Option<{
                 peer: String,
                 track: String,
                 audio_level: Number,
