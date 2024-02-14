@@ -127,7 +127,7 @@ The explanation of each request parameter:
 - event:
 
     - publish: `full` will publish both peer info and track info. `track` will only publish track info.
-    - subscribe: `full` will subscribe to both remote peer info and track info. `track` will only subscribe to remote track info. `manual` will not subscribe to any source, the client must do it manually. This feature is useful for clients who want to use manual mode to subscribe to remote tracks. For example, in a spatial room application, the client will set it to `manual` and only subscribe to peers that are near to it.
+    - subscribe: `full` will subscribe to both remote peer info and track info. `track` will only subscribe to remote track info. `manual` will not subscribe to any source, the client must do it manually. This feature is useful for clients who want to use manual mode to subscribe to remote tracks. For example, in a proximity based audio application like [Gather](https://www.gather.town/), the client will set it to `manual` and only subscribe to peers that are near to it.
 
 - bitrate:
 
@@ -140,15 +140,18 @@ The explanation of each request parameter:
 
         - kind: the kind of receiver, audio or video.
         - id: the ID of the receiver.
-        - remote: the remote source that the client wants to pin to. If it's none, the receiver will be created but not pinned to any source.
-        - limit: the limit of the receiver. If it's none, the receiver will be created with the default limit.
+        - state: the state of the receiver. It's used to restore the receiver state when the client reconnects to the server. It contains:
+            - remote: the remote source that the client wants to pin to. If it's none, the receiver will be created but not pinned to any source.
+            - limit: the limit of the receiver. If it's none, the receiver will be created with the default limit.
 
     - senders: a list of senders that the client wants to create. Each sender is described with:
         - kind: the kind of sender, audio or video.
         - id: the ID of the sender.
         - uuid: the UUID of the sender. It's used to identify the sender on the client side.
         - label: the label of the sender. It's used to identify the sender on the client side.
-        - screen: a flag to indicate whether the sender is screen sharing.
+        - state: the state of the sender. It's used to restore the sender state when the client reconnects to the server. It contains:
+            - screen: a flag to indicate whether the sender is screen sharing.
+            - pause: a flag to indicate whether the sender is paused.
 
 - sdp: the OfferSDP that the client created.
 
@@ -226,13 +229,13 @@ The seq is an incremental value generated on the sender side. It helps us to map
 
 The cmd is generate with rule: `identify.action`, for example:
 
-- `peer.updateSdp`.
+- `peer.update_sdp`.
 - `sender.{sender_id}.toggle`.
 - `receiver.{receiver_id}.switch`.
 - `room.peers.subscribe`.
 - `room.peers.unsubscribe`.
 - `session.disconnect`.
-- `session.features.mix-minus.add_source`.
+- `session.features.mix_minus.sources.add`.
 
 ## 4.6 In-session requests
 
@@ -246,13 +249,13 @@ Typically, the client will need to perform various actions with the media server
 - Sender actions: pause, resume, switch stream
 - Receiver actions: pause, resume, switch remote source, update priority, and layers
 
-All actions that involve changing tracks will be performed locally first, and then the `updateSdp` command will be sent to the server.
+All actions that involve changing tracks will be performed locally first, and then the `update_sdp` command will be sent to the server.
 
-### 4.6.1 UpdateSDP
+### 4.6.1 Update SDP
 
-Each time we make changes to the WebRTC connection or negotiationneeded event fired, we need to send an `updateSdp` request to the server over the data channel. This request is described below:
+Each time we make changes to the WebRTC connection or negotiationneeded event fired, we need to send an `update_sdp` request to the server over the data channel. This request is described below:
 
-**_Cmd:_**: `peer.updateSdp`
+**_Cmd:_**: `peer.update_sdp`
 
 **_Data:_**
 
@@ -293,13 +296,15 @@ We can subscribe to peers event (joined, left, track added, track removed) and a
 
 #### 4.6.2.1 Subscribe to other peers event
 
+(Note that this action only works with `event.subscribe` manual mode.)
+
 **_Cmd:_** `room.peers.subscribe`
 
 **_Request Data:_**
 
 ```
 {
-    peer_id: String,
+    peer_ids: [String],
 }
 ```
 
@@ -307,13 +312,15 @@ We can subscribe to peers event (joined, left, track added, track removed) and a
 
 #### 4.6.2.2 Unsubscribe to other peers event
 
+(Note that this action only works with `subscribe` manual mode.)
+
 **_Cmd:_**: `room.peers.unsubscribe`
 
 **_Request Data:_**
 
 ```
 {
-    peer_id: String,
+    peer_ids: [String],
 }
 
 ```
@@ -332,15 +339,15 @@ We can subscribe to peers event (joined, left, track added, track removed) and a
 
 ### 4.6.4 Session Sender create/release, actions, events
 
-For creating a sender, we need to create a transceiver with kind as audio or video. After that, we need to create a track and add it to the transceiver. Then we need to send an updateSDP request to the server.
+For creating a sender, we need to create a transceiver with kind as audio or video. After that, we need to create a track and add it to the transceiver. Then we need to send an `update_sdp` request to the server.
 
-For destroying a sender, we need to remove the track from the transceiver and remove the transceiver from the connection. Then we need to send an updateSDP request to the server.
+For destroying a sender, we need to remove the track from the transceiver and remove the transceiver from the connection. Then we need to send an `update_sdp` request to the server.
 
 Each sender has some actions and events with the following rule: `session.sender.{id}.{action}`
 
 #### 4.6.4.1 Switch sender source
 
-**_Cmd:_**: `session.sender.{id}.toggle`
+**_Cmd:_**: `session.senders.{id}.toggle`
 
 **_Request data:_**
 
@@ -353,9 +360,9 @@ Each sender has some actions and events with the following rule: `session.sender
 
 **_Response Data:_**: None
 
-**_Cmd:_**: `sender_event.{id}.state`
-
 #### 4.6.4.2 State event
+
+**_Cmd:_**: `session.senders.{id}.state`
 
 **_Event data:_**:
 
@@ -367,13 +374,13 @@ Each sender has some actions and events with the following rule: `session.sender
 
 ### 4.6.5 Session Receiver create/release, actions
 
-To create a receiver, we need to create a transceiver with kind as audio or video. After that, we need to create a track and add it to the transceiver. Then we need to send an updateSdp request to the server.
+To create a receiver, we need to create a transceiver with kind as audio or video. After that, we need to create a track and add it to the transceiver. Then we need to send an `update_sdp` request to the server.
 
 Each receiver has some actions and events with the following rule: `session.receiver.{id}.{action}`
 
 ### 4.6.5.1 Switch receiver source
 
-**_Cmd:_**: `session.receiver.{id}.switch`
+**_Cmd:_**: `session.receivers.{id}.switch`
 
 **_Request data:_**
 
@@ -410,7 +417,7 @@ If remote is none, the receiver will be paused.
 
 ### 4.6.5.3 Receiver state event
 
-**_Event:_**: `session.receiver.{id}.state`
+**_Event:_**: `session.receivers.{id}.state`
 
 **_Event data:_**:
 
@@ -420,6 +427,10 @@ If remote is none, the receiver will be paused.
     source: Option<{
         peer: String,
         track: String,
+        scaling: "single" | "simulcast" | "svc",
+        spatials: Number,
+        temporals: Number,
+        codec: "opus" | "vp8" | "vp9" | "h264" | "h265" | "av1",
     }>,
 }
 ```
@@ -433,17 +444,13 @@ Receiver state is explained below:
 
 ### 4.6.5.3 Receiver stats event
 
-**_Event:_**: `session.receiver.{id}.stats`
+**_Event:_**: `session.receivers.{id}.stats`
 
 **_Event data:_**:
 
 ```
 {
-    codec: String,
     ingress: Option<{
-        scaling: "single" | "simulcast" | "svc",
-        spatials: Number,
-        temporals: Number,
         bitrate: Number,
         rtt: Number,
         lost: Number,
@@ -491,14 +498,18 @@ In connect request, we add field to features params:
 
 Note that, this action only work with `manual` mode.
 
-**_Cmd:_**: `session.features.mix-minus.add_source`
+**_Cmd:_**: `session.features.mix_minus.sources.add`
 
 **_Request data:_**
 
 ```
 {
-    peer: String,
-    track: String,
+    sources: [
+        {
+            peer: String,
+            track: String,
+        }
+    ]
 }
 ```
 
@@ -508,14 +519,18 @@ Note that, this action only work with `manual` mode.
 
 Note that, this action only work with `manual` mode.
 
-**_Cmd:_**: `session.features.mix-minus.remove_source`
+**_Cmd:_**: `session.features.mix_minus.sources.remove`
 
 **_Request data:_**
 
 ```
 {
-    peer: String,
-    track: String,
+    sources: [
+        {
+            peer: String,
+            track: String,
+        }
+    ]
 }
 ```
 
@@ -523,7 +538,7 @@ Note that, this action only work with `manual` mode.
 
 #### 4.7.1.4 Pause mix-minus mixer
 
-**_Cmd:_**: `session.features.mix-minus.pause`
+**_Cmd:_**: `session.features.mix_minus.pause`
 
 **_Request data:_** None
 
@@ -531,7 +546,7 @@ Note that, this action only work with `manual` mode.
 
 #### 4.7.1.5 Resume mix-minus mixer
 
-**_Cmd:_**: `session.features.mix-minus.resume`
+**_Cmd:_**: `session.features.mix_minus.resume`
 
 **_Request data:_**: None
 
@@ -539,15 +554,14 @@ Note that, this action only work with `manual` mode.
 
 #### 4.7.1.6 State event
 
-**_Cmd:_**: `session.features.mix-minus.state`
+**_Cmd:_**: `session.features.mix_minus.state`
 
 **_Event data:_**
 
 ```
 {
-    layers: [
+    slots: [
         {
-            id: string,
             remote: Option<{
                 peer: String,
                 track: String,
