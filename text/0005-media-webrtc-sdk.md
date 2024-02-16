@@ -136,7 +136,7 @@ The explanation of each request parameter:
 - version: is the version of the client SDK.
 - room_id: is the room that the client wants to connect to. This is [a-z0-9-] string, maximum is 32 characters.
 - peer_id: is the ID of the client. It's used to identify the client on the server side. It's unique in the room. This is [a-z0-9-] string, maximum is 32 characters
-- metadata: is the metadata of the client. It can be used to store some information about the client, such as user name .... It's optional and should small than 512 characters.
+- metadata: is the metadata of the client. It can be used to store some information about the client, such as user name .... It's optional and should be smaller than 512 characters.
 - event:
 
   - publish: `full` will publish both peer info and track info. `track` will only publish track info.
@@ -161,7 +161,7 @@ The explanation of each request parameter:
     - kind: the kind of sender, audio or video.
     - id: the ID of the sender.
     - uuid: the UUID of the sender. It's used to identify the sender on the client side.
-    - metadata: It can be used to store some information about the client's track, such as label name, device .... It's optional and should small than 512 characters.
+    - metadata: It can be used to store some information about the client's track, such as label name, device .... It's optional and should be smaller than 512 characters.
     - state: the state of the sender. It's used to restore the sender state when the client reconnects to the server. It contains:
       - screen: a flag to indicate whether the sender is screen sharing.
       - pause: a flag to indicate whether the sender is paused.
@@ -251,7 +251,7 @@ The cmd is generate with rule: `identify.action`, for example:
 
 ## 4.6 In-session requests
 
-At the current state, we only have one WebRTC connection to the server, so there is no need to send any requests over HTTP. All requests will be sent over the WebRTC datachannel.
+At the current state, we already have one WebRTC connection to the server, so there is no need to send any requests over HTTP. All requests will be sent over the WebRTC datachannel.
 
 Typically, the client will need to perform various actions with the media server, such as:
 
@@ -434,7 +434,7 @@ In case of a server shutdown or restart, the client should reconnect by sending 
 
 **_Response Data:_**: None
 
-`remain_seconds` is the time that the client has to reconnect to the server. If it's 0, the client should reconnect immediately.
+`remain_seconds` represents the remaining time that the client will be served by the server. In the event that a client needs to reconnect, it should do so before the remain_seconds expire to avoid interrupting the client session.
 
 In case of "shutdown", the client should reconnect by sending restart-ice request.
 
