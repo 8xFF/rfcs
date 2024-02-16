@@ -76,6 +76,7 @@ Once the client is ready, it can send a connect request to the server.
     version: Option<String>,
     room: String,
     peer: String,
+    metadata: Option<String>,
     event: {
         publish: "full" | "track",
         subscribe: "full" | "track" | "manual",
@@ -109,10 +110,10 @@ Once the client is ready, it can send a connect request to the server.
                 kind: "audio" | "video",
                 id: String,
                 uuid: String,
-                label: String,
+                metadata: Option<String>,
                 state: Option<{
+                    active: bool,
                     screen: bool,
-                    pause: bool,
                 }>,
             }
         ],
@@ -133,6 +134,9 @@ Once the client is ready, it can send a connect request to the server.
 The explanation of each request parameter:
 
 - version: is the version of the client SDK.
+- room_id: is the room that the client wants to connect to. This is [a-z0-9-] string, maximum is 32 characters.
+- peer_id: is the ID of the client. It's used to identify the client on the server side. It's unique in the room. This is [a-z0-9-] string, maximum is 32 characters
+- metadata: is the metadata of the client. It can be used to store some information about the client, such as user name .... It's optional and should small than 512 characters.
 - event:
 
   - publish: `full` will publish both peer info and track info. `track` will only publish track info.
@@ -157,7 +161,7 @@ The explanation of each request parameter:
     - kind: the kind of sender, audio or video.
     - id: the ID of the sender.
     - uuid: the UUID of the sender. It's used to identify the sender on the client side.
-    - label: the label of the sender. It's used to identify the sender on the client side.
+    - metadata: It can be used to store some information about the client's track, such as label name, device .... It's optional and should small than 512 characters.
     - state: the state of the sender. It's used to restore the sender state when the client reconnects to the server. It contains:
       - screen: a flag to indicate whether the sender is screen sharing.
       - pause: a flag to indicate whether the sender is paused.
@@ -281,8 +285,11 @@ Each time we make changes to the WebRTC connection or negotiationneeded event fi
                 kind: "audio" | "video",
                 id: String,
                 uuid: String,
-                label: String,
-                screen: Option<bool>,
+                metadata: Option<String>,
+                state: Option<{
+                    active: bool,
+                    screen: bool,
+                }>,
             }
         ],
     }
@@ -332,6 +339,65 @@ We can subscribe to peers event (joined, left, track added, track removed) and a
 
 ```
 
+#### 4.6.2.3 Peer joined event
+
+**_Cmd:_**: `room.peers.{peer}.joined`
+
+**_Event data:_**:
+
+```
+{
+    metadata: Option<String>,
+}
+```
+
+**_Response Data:_**: None
+
+#### 4.6.2.3 Peer left event
+
+**_Cmd:_**: `room.peers.{peer}.left`
+
+**_Event data:_**: None
+
+**_Response Data:_**: None
+
+#### 4.6.2.3 Track added event
+
+**_Cmd:_**: `room.peers.{peer}.tracks.{track}.added`
+
+**_Event data:_**:
+
+```
+{
+    metadata: Option<String>,
+    state: {
+        active: bool,
+        screen: bool,
+        simulcast: bool,
+    },
+}
+```
+
+#### 4.6.2.3 Track updated event
+
+**_Cmd:_**: `room.peers.{peer}.tracks.{track}.updated`
+
+**_Event data:_**:
+
+```
+{
+    state: {
+        active: bool,
+    },
+}
+```
+
+#### 4.6.2.3 Track removed event
+
+**_Cmd:_**: `room.peers.{peer}.tracks.{track}.removed`
+
+**_Event data:_**: None
+
 **_Response Data:_**: None
 
 ### 4.6.3 Session actions, event
@@ -343,6 +409,34 @@ We can subscribe to peers event (joined, left, track added, track removed) and a
 **_Request data:_**: None
 
 **_Response:_**: None
+
+#### 4.6.3.2 Goaway event
+
+Goaway event is sent by the server in some cases:
+
+- The server is going to shutdown or restart.
+- The client lifetime is expired, this is useful in some video conference application where each client only has limited session time; example 1 hour.
+- The client is kicked by the server.
+
+In case of a server shutdown or restart, the client should reconnect by sending restart-ice request.
+
+**_Cmd:_**: `session.on_goaway`
+
+**_Event data:_**:
+
+```
+{
+    reason: "shutdown" | "kick",
+    message: Option<String>,
+    remain_seconds: Number,
+}
+```
+
+**_Response Data:_**: None
+
+`remain_seconds` is the time that the client has to reconnect to the server. If it's 0, the client should reconnect immediately.
+
+In case of "shutdown", the client should reconnect by sending restart-ice request.
 
 ### 4.6.4 Session Sender create/release, actions, events
 
@@ -361,11 +455,16 @@ Each sender has some actions and events with the following rule: `session.sender
 ```
 {
     track: Option<String>,
-    label: Option<String>,
+    metadata: Option<String>,
+    state: {
+        active: bool,
+    }
 }
 ```
 
 **_Response Data:_**: None
+
+If the track is none, the sender will be switched to an inactive state, and other clients will receive a track removed event. In case a client needs to deactivate the sender, it should set 'active' to false; this is useful for the mic mute feature.
 
 #### 4.6.4.2 State event
 
