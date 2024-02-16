@@ -20,7 +20,7 @@ jobs:
       run: |
         ./generate-book.py
     - name: Upload Artifact
-      uses: actions/upload-pages-artifact@v1.0.10
+      uses: actions/upload-pages-artifact@v3.0.1
       with:
         path: ./book
 
