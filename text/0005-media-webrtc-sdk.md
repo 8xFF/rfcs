@@ -74,8 +74,8 @@ Once the client is ready, it can send a connect request to the server.
 ```
 {
     version: Option<String>,
-    room: String,
-    peer: String,
+    room_id: String,
+    peer_id: String,
     metadata: Option<String>,
     event: {
         publish: "full" | "track",
@@ -92,8 +92,8 @@ Once the client is ready, it can send a connect request to the server.
                 id: String,
                 state: Option<{
                     source: Option<{
-                        peer: String,
-                        track: String,
+                        peer_id: String,
+                        track_id: String,
                     }>,
                     limit: Option<{
                         priority: u16,
@@ -109,16 +109,18 @@ Once the client is ready, it can send a connect request to the server.
             {
                 kind: "audio" | "video",
                 id: String,
-                uuid: String,
+                source: Option<{
+                    id: String,
+                    screen: bool,
+                }>,
                 metadata: Option<String>,
                 state: Option<{
                     active: bool,
-                    screen: bool,
                 }>,
             }
         ],
     },
-    sdp: Option<String>
+    sdp: String
 }
 ```
 
@@ -178,7 +180,7 @@ Error list:
 | Error code            | Description             |
 | --------------------- | ----------------------- |
 | INVALID_TOKEN         | The token is invalid.   |
-| SDP_ERROR             | The sdp is invalid.     |
+| INVALID_SDP           | The sdp is invalid.     |
 | INVALID_REQUEST       | The request is invalid. |
 | INTERNAL_SERVER_ERROR | The server is error.    |
 | GATEWAY_ERROR         | The gateway is error.   |
@@ -205,9 +207,25 @@ Each time the client's WebRTC connection has a new ice-candidate, it should be s
 
 **_Endpoint_**: POST `GATEWAY/webrtc/conns/:conn_id/ice-candidate`
 
-**_Body_**: candidate String
+**_Body_**:
+
+```
+{
+    candidate: String
+}
+```
 
 **_Response Data_**: None
+
+Error list:
+
+| Error code            | Description             |
+| --------------------- | ----------------------- |
+| INVALID_CONN          | The conn_id is invalid. |
+| INVALID_ICE           | The ice is invalid.     |
+| INVALID_REQUEST       | The request is invalid. |
+| INTERNAL_SERVER_ERROR | The server is error.    |
+| GATEWAY_ERROR         | The gateway is error.   |
 
 ## 4.5 Datachannel Request/Response format
 
@@ -241,9 +259,9 @@ The seq is an incremental value generated on the sender side. It helps us to map
 
 The cmd is generate with rule: `identify.action`, for example:
 
-- `peer.update_sdp`.
-- `sender.{sender_id}.toggle`.
-- `receiver.{receiver_id}.switch`.
+- `session.update_sdp`.
+- `session.senders.toggle`.
+- `sessions.receivers.switch`.
 - `room.peers.subscribe`.
 - `room.peers.unsubscribe`.
 - `session.disconnect`.
@@ -266,7 +284,7 @@ All actions that involve changing tracks will be performed locally first, and th
 
 Each time we make changes to the WebRTC connection or negotiationneeded event fired, we need to send an `update_sdp` request to the server over the data channel. This request is described below:
 
-**_Cmd:_**: `peer.update_sdp`
+**_Cmd:_**: `session.update_sdp`
 
 **_Data:_**
 
@@ -278,17 +296,32 @@ Each time we make changes to the WebRTC connection or negotiationneeded event fi
             {
                 kind: "audio" | "video",
                 id: String,
+                state: Option<{
+                    source: Option<{
+                        peer_id: String,
+                        track_id: String,
+                    }>,
+                    limit: Option<{
+                        priority: u16,
+                        min_spatial: Option<u8>,
+                        max_spatial: u8,
+                        min_temporal: Option<u8>,
+                        max_temporal: u8,
+                    }>,
+                }>
             }
         ],
         senders: [
             {
                 kind: "audio" | "video",
                 id: String,
-                uuid: String,
+                source: Option<{
+                    id: String,
+                    screen: bool,
+                }>,
                 metadata: Option<String>,
                 state: Option<{
                     active: bool,
-                    screen: bool,
                 }>,
             }
         ],
@@ -304,11 +337,13 @@ Each time we make changes to the WebRTC connection or negotiationneeded event fi
 }
 ```
 
+If state is defined, the server will update the state of the receiver/sender. If state is none, the server will not update the state of the receiver/sender.
+
 ### 4.6.2 Room actions, event
 
 We can subscribe to peers event (joined, left, track added, track removed) and also can unsubscribe from it.
 
-#### 4.6.2.1 Subscribe to other peers event
+#### 4.6.2.1 Action: Subscribe to other peers event
 
 (Note that this action only works with `event.subscribe` manual mode.)
 
@@ -324,7 +359,7 @@ We can subscribe to peers event (joined, left, track added, track removed) and a
 
 **_Response Data:_** None
 
-#### 4.6.2.2 Unsubscribe to other peers event
+#### 4.6.2.2 Action: Unsubscribe to other peers event
 
 (Note that this action only works with `subscribe` manual mode.)
 
@@ -339,70 +374,100 @@ We can subscribe to peers event (joined, left, track added, track removed) and a
 
 ```
 
-#### 4.6.2.3 Peer joined event
+#### 4.6.2.3 Event: Peer joined
 
-**_Cmd:_**: `room.peers.{peer}.joined`
+**_Cmd:_**: `room.peers.added`
 
 **_Event data:_**:
 
 ```
 {
+    peer_id: String,
     metadata: Option<String>,
 }
 ```
 
 **_Response Data:_**: None
 
-#### 4.6.2.3 Peer left event
+#### 4.6.2.3 Event: Peer left
 
-**_Cmd:_**: `room.peers.{peer}.left`
-
-**_Event data:_**: None
-
-**_Response Data:_**: None
-
-#### 4.6.2.3 Track added event
-
-**_Cmd:_**: `room.peers.{peer}.tracks.{track}.added`
+**_Cmd:_**: `room.peers.removed`
 
 **_Event data:_**:
 
 ```
 {
-    metadata: Option<String>,
-    state: {
-        active: bool,
+    peer_id: String,
+}
+```
+
+**_Response Data:_**: None
+
+#### 4.6.2.3 Event: Track added
+
+**_Cmd:_**: `room.tracks.added`
+
+**_Event data:_**:
+
+```
+{
+    kind: "audio" | "video",
+    peer_id: String,
+    track_id: String,
+    source: Option<{
+        id: String,
         screen: bool,
-        simulcast: bool,
+    }>,
+    metadata: Option<String>,
+    state: {
+        active: bool,
+        scaling: Option<"simulcast" | "svc">,
     },
 }
 ```
 
-#### 4.6.2.3 Track updated event
+#### 4.6.2.3 Event: Track updated
 
-**_Cmd:_**: `room.peers.{peer}.tracks.{track}.updated`
+**_Cmd:_**: `room.peers.tracks.updated`
 
 **_Event data:_**:
 
 ```
 {
+    kind: "audio" | "video",
+    peer_id: String,
+    track_id: String,
+    source: Option<{
+        id: String,
+        screen: bool,
+    }>,
+    metadata: Option<String>,
     state: {
         active: bool,
+        scaling: Option<"simulcast" | "svc">,
     },
 }
 ```
 
-#### 4.6.2.3 Track removed event
+#### 4.6.2.3 Event: Track removed
 
-**_Cmd:_**: `room.peers.{peer}.tracks.{track}.removed`
+**_Cmd:_**: `room.tracks.removed`
 
-**_Event data:_**: None
+**_Event data:_**:
+
+```
+{
+    kind: "audio" | "video",
+    peer_id: String,
+    track_id: String,
+}
+```
 
 **_Response Data:_**: None
 
 ### 4.6.3 Session actions, event
 
-#### 4.6.3.1 Disconnect
+#### 4.6.3.1 Action: Disconnect
 
 **_Cmd:_**: `session.disconnect`
 
@@ -410,7 +475,7 @@ We can subscribe to peers event (joined, left, track added, track removed) and a
 
 **_Response:_**: None
 
-#### 4.6.3.2 Goaway event
+#### 4.6.3.2 Event: Goaway
 
 Goaway event is sent by the server in some cases:
 
@@ -446,36 +511,85 @@ For destroying a sender, we need to remove the track from the transceiver and re
 
 Each sender has some actions and events with the following rule: `session.sender.{id}.{action}`
 
-#### 4.6.4.1 Switch sender source
+#### 4.6.4.1 Action: Switch sender source
 
-**_Cmd:_**: `session.senders.{id}.toggle`
+This action is used when the user changes the source, for example, when the user changes the camera or microphone. This can also be used when the user stops sharing the camera, in which case we will release the local stream and send a switch without the source param.
+
+**_Cmd:_**: `session.senders.switch`
 
 **_Request data:_**
 
 ```
 {
-    track: Option<String>,
+    id: String,
+    source: Option<{
+        id: String,
+        screen: bool,
+    }>,
     metadata: Option<String>,
-    state: {
-        active: bool,
-    }
 }
 ```
 
 **_Response Data:_**: None
 
-If the track is none, the sender will be switched to an inactive state, and other clients will receive a track removed event. In case a client needs to deactivate the sender, it should set 'active' to false; this is useful for the mic mute feature.
+If source is none, this sender will be removed from the room, and the receiver that is pinned to this sender will receive an updated event with the source not set. The room also sends a `room.senders.removed` event to all subscribed peers.
 
-#### 4.6.4.2 State event
+If the source is set and changed, this sender's active state will be reset to true. Note that screen and metadata only work with a changed source value. In the case of the source not being changed, the server will refuse the request.
 
-**_Cmd:_**: `session.senders.{id}.state`
+#### 4.6.4.1 Action: Toggle sender pause/resume
+
+This action is used when user mute/unmute the sender, this is useful when toggle the microphone button, we just stop local source and sending toggle with active false param.
+
+**_Cmd:_**: `session.senders.toggle`
+
+**_Request data:_**
+
+```
+{
+    id: String,
+    active: bool,
+}
+```
+
+**_Response Data:_**: None
+
+#### 4.6.4.2 Event: State event
+
+This event is sent by the server when the state of the sender is changed. This is useful when the client implements loading animation when the user changes the source, or when the user mutes/unmutes the sender.
+
+**_Cmd:_**: `session.senders.state`
 
 **_Event data:_**:
 
 ```
 {
-    state: "new" | "live" | "paused"
+    id: String,
+    state: "waiting" | "no-source" | "active" | "inactive"
 }
+```
+
+- Waiting: The sender is pinned but server dont received any media data.
+- No-source: The sender is not pinned to any source.
+- Active: The sender is active, and server is receiving media data.
+- Inactive: The sender is pinned but .
+
+```mermaid
+graph LR
+    P1[create with source]
+    P2[create without source]
+    W[waiting]
+    NS[no-source]
+    A[active]
+    I[inactive]
+    P1 --> W
+    P2 --> NS
+    W -->|media data| A
+    A -->|toggle false| I
+    I -->|toggle true| W
+    NS -->|switch| W
+    W -->|switch none| NS
+    A -->|switch none| NS
+    I -->|switch none| NS
 ```
 
 ### 4.6.5 Session Receiver create/release, actions
@@ -484,56 +598,58 @@ To create a receiver, we need to create a transceiver with kind as audio or vide
 
 Each receiver has some actions and events with the following rule: `session.receiver.{id}.{action}`
 
-### 4.6.5.1 Switch receiver source
+### 4.6.5.1 Action: Switch receiver source
 
-**_Cmd:_**: `session.receivers.{id}.switch`
+**_Cmd:_**: `session.receivers.switch`
 
 **_Request data:_**
 
-````
+```
 {
+    id: string,
     priority: u16,
     source: Option<{
-        peer: String,
-        track: String,
+        peer_id: String,
+        track_id: String,
     }>,
 }
+```
 
-***Response data:***: None
+**_Response data:_**: None
 
 If source is none, the receiver will be paused.
 
-### 4.6.5.2 Limit receiver bitrate
+### 4.6.5.2 Action: Limit receiver bitrate
 
-***Cmd:***: `session.receiver.{id}.limit`
+**_Cmd:_**: `session.receiver.limit`
 
-***Request data:***
+**_Request data:_**
 
 ```
 {
+    id: String,
     priority: u16,
     min_spatial: Option<u8>,
     max_spatial: u8,
     min_temporal: Option<u8>,
     max_temporal: u8,
 }
-````
+```
 
 **_Response data:_**: None
 
-### 4.6.5.3 Receiver state event
+### 4.6.5.3 Event: Receiver state
 
-**_Event:_**: `session.receivers.{id}.state`
+**_Event:_**: `session.receivers.state`
 
 **_Event data:_**:
 
 ```
 {
-    state: "no_source" | "live" | "key_only" | "inactive",
+    id: String,
+    state: "no_source" | "waiting" | "live" | "key_only" | "inactive",
     source: Option<{
-        peer: String,
-        track: String,
-        scaling: "single" | "simulcast" | "svc",
+        scaling: Option<"simulcast" | "svc">,
         spatials: Number,
         temporals: Number,
         codec: "opus" | "vp8" | "vp9" | "h264" | "h265" | "av1",
@@ -544,18 +660,47 @@ If source is none, the receiver will be paused.
 Receiver state is explained below:
 
 - `no_source`: The receiver is created but not pinned to any source.
+- `waiting`: The receiver is pinned but does not received media data.
 - `live`: The receiver is live.
 - `key_only`: The receiver is live but only receives key frames, which may be for speed limiting purposes.
 - `inactive`: The receiver is pinned but does not have enough bandwidth to receive.
 
-### 4.6.5.3 Receiver stats event
+```mermaid
+graph LR
+    NS[no-source]
+    W[waiting]
+    L[live]
+    KO[key-only]
+    I[inactive]
+    NS -->|switch| W
+    W -->|media data + bandwidth level 2| L
+    W -->|media data + bandwidth level 1| KO
+    L -->|speed limit| KO
+    W -->|media data + no bandwidth| I
+    L -->|no bandwidth| I
+    KO -->|no bandwidth| I
+    W -->|switch none| NS
+    L -->|switch none| NS
+    I -->|switch none| NS
+    KO -->|switch none| NS
+    I --> |bandwidth level 2| L
+    I --> |bandwidth level 1| KO
+    KO --> |bandwidth level 2| L
+    W --> |Source lost| NS
+    L --> |Source lost| NS
+    KO --> |Source lost| NS
+    I --> |Source lost| NS
+```
 
-**_Event:_**: `session.receivers.{id}.stats`
+### 4.6.5.3 Event: Receiver stats
+
+**_Event:_**: `session.receivers.stats`
 
 **_Event data:_**:
 
 ```
 {
+    id: String,
     source: Option<{
         bitrate: Number,
         rtt: Number,
@@ -590,8 +735,8 @@ In connect request, we add field to features params:
             mode: "manual" | "auto",
             sources: [
                 {
-                    peer: String,
-                    track: String,
+                    peer_id: String,
+                    track_id: String,
                 }
             ]
         }
@@ -599,7 +744,7 @@ In connect request, we add field to features params:
 }
 ```
 
-#### 4.7.1.2 Add source to mixer
+#### 4.7.1.2 Action: Add source to mixer
 
 Note that, this action only work with `manual` mode.
 
@@ -611,8 +756,8 @@ Note that, this action only work with `manual` mode.
 {
     sources: [
         {
-            peer: String,
-            track: String,
+            peer_id: String,
+            track_id: String,
         }
     ]
 }
@@ -620,7 +765,7 @@ Note that, this action only work with `manual` mode.
 
 **_Response data:_**: None
 
-#### 4.7.1.3 Remove source from mixer
+#### 4.7.1.3 Action: Remove source from mixer
 
 Note that, this action only work with `manual` mode.
 
@@ -632,8 +777,8 @@ Note that, this action only work with `manual` mode.
 {
     sources: [
         {
-            peer: String,
-            track: String,
+            peer_id: String,
+            track_id: String,
         }
     ]
 }
@@ -641,7 +786,7 @@ Note that, this action only work with `manual` mode.
 
 **_Response data:_**: None
 
-#### 4.7.1.4 Pause mix-minus mixer
+#### 4.7.1.4 Action: Pause mix-minus mixer
 
 **_Cmd:_**: `session.features.mix_minus.pause`
 
@@ -649,7 +794,7 @@ Note that, this action only work with `manual` mode.
 
 **_Response data:_**: None
 
-#### 4.7.1.5 Resume mix-minus mixer
+#### 4.7.1.5 Action: Resume mix-minus mixer
 
 **_Cmd:_**: `session.features.mix_minus.resume`
 
@@ -657,7 +802,7 @@ Note that, this action only work with `manual` mode.
 
 **_Response data:_**: None
 
-#### 4.7.1.6 State event
+#### 4.7.1.6 Event: State update
 
 **_Cmd:_**: `session.features.mix_minus.state`
 
@@ -668,8 +813,8 @@ Note that, this action only work with `manual` mode.
     slots: [
         {
             source: Option<{
-                peer: String,
-                track: String,
+                peer_id: String,
+                track_id: String,
                 audio_level: Number,
             }>,
         }
